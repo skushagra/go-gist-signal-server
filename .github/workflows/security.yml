@@ -2,9 +2,10 @@ name: DevSecOps
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
+  workflow_dispatch:
   schedule:
     # Run security scans weekly on Sundays at midnight
     - cron: "0 0 * * 0"
