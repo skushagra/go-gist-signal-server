@@ -58,7 +58,8 @@ jobs:
 
       - name: Save image for testing
         run: |
-          docker save ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} -o /tmp/docker-image.tar
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          docker save ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA} -o /tmp/docker-image.tar
 
       - name: Upload image artifact
         uses: actions/upload-artifact@v4
@@ -84,11 +85,12 @@ jobs:
 
       - name: Run container
         run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           docker run -d \
             --name app-test \
             -p 3000:3000 \
             -e NODE_ENV=production \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}
 
       - name: Wait for container to be ready
         run: |
