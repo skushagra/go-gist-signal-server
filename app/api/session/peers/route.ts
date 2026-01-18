@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     let peers: string[];
     try {
         peers = JSON.parse(data as string);
-    } catch (e) {
+    } catch {
         peers = [];
     }
 
