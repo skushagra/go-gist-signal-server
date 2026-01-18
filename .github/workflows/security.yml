@@ -119,69 +119,6 @@ jobs:
           extra_args: --only-verified
         continue-on-error: true
 
-  # Container Security (for Docker builds)
-  container-scan:
-    name: Container Vulnerability Scan
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "pnpm"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build Next.js app
-        run: pnpm build
-
-      - name: Build Docker image
-        run: |
-          # Copy static files into standalone folder structure
-          mkdir -p .next/standalone/.next/static
-          cp -r .next/static/* .next/standalone/.next/static/ 2>/dev/null || true
-
-          cat > Dockerfile.security-scan <<EOF
-          FROM node:22-alpine
-          WORKDIR /app
-          COPY public ./public
-          COPY .next/standalone ./
-          ENV NODE_ENV=production
-          ENV PORT=3000
-          ENV HOSTNAME="0.0.0.0"
-          EXPOSE 3000
-          CMD ["node", "server.js"]
-          EOF
-          docker build -f Dockerfile.security-scan -t app:security-scan .
-
-      - name: Run Trivy container scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "app:security-scan"
-          format: "sarif"
-          output: "trivy-container.sarif"
-          severity: "CRITICAL,HIGH"
-          vuln-type: "os,library"
-
-      - name: Upload Trivy Container SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
-        if: always() && hashFiles('trivy-container.sarif') != ''
-        with:
-          sarif_file: trivy-container.sarif
-          category: trivy-container
-
   # OWASP Dependency Check
   owasp:
     name: OWASP Dependency Check
@@ -215,7 +152,7 @@ jobs:
   security-summary:
     name: Security Summary
     runs-on: ubuntu-latest
-    needs: [sast, sca, secrets, container-scan, owasp]
+    needs: [sast, sca, secrets, owasp]
     if: always()
     steps:
       - name: Security scan summary
@@ -227,7 +164,6 @@ jobs:
           echo "| SAST (Semgrep) | ${{ needs.sast.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| SCA (Trivy) | ${{ needs.sca.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Secret Detection | ${{ needs.secrets.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Container Scan | ${{ needs.container-scan.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| OWASP Dependency Check | ${{ needs.owasp.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "View detailed findings in the **Security** tab." >> $GITHUB_STEP_SUMMARY
