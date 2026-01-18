@@ -15,6 +15,7 @@ concurrency:
 env:
   REGISTRY: docker.io
   IMAGE_NAME: ${{ github.repository }}
+  DOCKERHUB_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/go-gist-signal-server
 
 jobs:
   # Build Docker image
@@ -182,7 +183,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.DOCKERHUB_IMAGE }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
@@ -207,7 +208,7 @@ jobs:
           echo "## 🐳 Docker Image Published" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Registry:** DockerHub" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.DOCKERHUB_IMAGE }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Tags" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
