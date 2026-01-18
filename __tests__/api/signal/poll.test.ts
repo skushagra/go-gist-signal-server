@@ -15,9 +15,7 @@ describe("GET /api/signal/poll", () => {
   });
 
   it("should return 400 if session is not provided", async () => {
-    const request = new Request(
-      "http://localhost:3000/api/signal/poll?peerID=peer-1"
-    );
+    const request = new Request("http://localhost:3000/api/signal/poll?peerID=peer-1");
 
     const response = await GET(request);
     const data = await response.json();
@@ -27,9 +25,7 @@ describe("GET /api/signal/poll", () => {
   });
 
   it("should return 400 if peerID is not provided", async () => {
-    const request = new Request(
-      "http://localhost:3000/api/signal/poll?session=test-session"
-    );
+    const request = new Request("http://localhost:3000/api/signal/poll?session=test-session");
 
     const response = await GET(request);
     const data = await response.json();

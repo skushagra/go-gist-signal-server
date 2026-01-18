@@ -26,9 +26,7 @@ describe("GET /api/session/peers", () => {
   it("should return empty array if session has no peers", async () => {
     (kv.hget as jest.Mock).mockResolvedValue(null);
 
-    const request = new Request(
-      "http://localhost:3000/api/session/peers?session=test-session"
-    );
+    const request = new Request("http://localhost:3000/api/session/peers?session=test-session");
 
     const response = await GET(request);
     const data = await response.json();
@@ -41,9 +39,7 @@ describe("GET /api/session/peers", () => {
     const mockPeers = ["peer-1", "peer-2", "peer-3"];
     (kv.hget as jest.Mock).mockResolvedValue(JSON.stringify(mockPeers));
 
-    const request = new Request(
-      "http://localhost:3000/api/session/peers?session=test-session"
-    );
+    const request = new Request("http://localhost:3000/api/session/peers?session=test-session");
 
     const response = await GET(request);
     const data = await response.json();
@@ -56,9 +52,7 @@ describe("GET /api/session/peers", () => {
   it("should handle malformed JSON in peers data", async () => {
     (kv.hget as jest.Mock).mockResolvedValue("invalid-json");
 
-    const request = new Request(
-      "http://localhost:3000/api/session/peers?session=test-session"
-    );
+    const request = new Request("http://localhost:3000/api/session/peers?session=test-session");
 
     const response = await GET(request);
     const data = await response.json();
