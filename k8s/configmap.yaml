@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: go-gist-signal-server-config
+  namespace: go-gist-signal-server
+  labels:
+    app: go-gist-signal-server
+data:
+  NODE_ENV: "production"
+  PORT: "3000"

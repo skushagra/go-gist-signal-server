@@ -106,7 +106,7 @@ jobs:
             docker logs app-test
             exit 1
           fi
-          echo "✅ Container is running"
+          echo "Container is running"
 
       - name: Health check
         run: |
@@ -119,11 +119,11 @@ jobs:
           done
 
           if [ $RETRY -eq $MAX_RETRIES ]; then
-            echo "❌ Health check failed after $MAX_RETRIES attempts"
+            echo "Health check failed after $MAX_RETRIES attempts"
             docker logs app-test
             exit 1
           fi
-          echo "✅ Health check passed"
+          echo "Health check passed"
 
       - name: Test API endpoints
         run: |
@@ -131,11 +131,11 @@ jobs:
           # Test root endpoint (landing page)
           RESPONSE=$(curl -sf http://localhost:3000 || echo "FAILED")
           if [ "$RESPONSE" = "FAILED" ]; then
-            echo "❌ Root endpoint test failed"
+            echo "Root endpoint test failed"
             docker logs app-test
             exit 1
           fi
-          echo "✅ Root endpoint responds"
+          echo "Root endpoint responds"
 
           # Test API returns proper error without KV (expected behavior)
           echo "Testing API endpoint error handling..."
@@ -143,11 +143,11 @@ jobs:
           echo "API returned HTTP $HTTP_CODE"
           # Any response (even 500) means the API route is working, just missing KV
           if [ "$HTTP_CODE" = "000" ]; then
-            echo "❌ API endpoint not reachable"
+            echo "API endpoint not reachable"
             docker logs app-test
             exit 1
           fi
-          echo "✅ API endpoint is reachable (HTTP $HTTP_CODE)"
+          echo "API endpoint is reachable (HTTP $HTTP_CODE)"
 
       - name: Container logs
         if: always()
@@ -206,7 +206,7 @@ jobs:
 
       - name: Generate build summary
         run: |
-          echo "## 🐳 Docker Image Published" >> $GITHUB_STEP_SUMMARY
+          echo "## Docker Image Published" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Registry:** DockerHub" >> $GITHUB_STEP_SUMMARY
           echo "**Image:** \`${{ env.REGISTRY }}/${{ env.DOCKERHUB_IMAGE }}\`" >> $GITHUB_STEP_SUMMARY
@@ -272,7 +272,7 @@ jobs:
     steps:
       - name: Container workflow summary
         run: |
-          echo "## 🐳 Containerization Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## Containerization Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,159 @@
+name: CD - Deploy to Local Kubernetes
+
+on:
+  workflow_run:
+    workflows: ["Containerization"]
+    types:
+      - completed
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker image tag to deploy (leave empty for latest)"
+        required: false
+        type: string
+
+concurrency:
+  group: CD-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  K8S_NAMESPACE: go-gist-signal-server
+
+jobs:
+  deploy:
+    name: Deploy to Docker Desktop K8s
+    runs-on: self-hosted
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine image tag
+        id: image-tag
+        run: |
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          else
+            SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+            echo "tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure kubectl
+        run: |
+          kubectl config use-context docker-desktop 2>/dev/null || true
+          kubectl cluster-info
+
+      - name: Create namespace
+        run: kubectl apply -f k8s/namespace.yaml
+
+      - name: Create GHCR pull secret
+        run: |
+          kubectl create secret docker-registry ghcr-secret \
+            --namespace=${{ env.K8S_NAMESPACE }} \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} \
+            --docker-password=${{ secrets.GITHUB_TOKEN }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create application secrets
+        run: |
+          kubectl create secret generic go-gist-signal-server-secrets \
+            --namespace=${{ env.K8S_NAMESPACE }} \
+            --from-literal=KV_URL="${{ secrets.KV_URL }}" \
+            --from-literal=KV_REST_API_URL="${{ secrets.KV_REST_API_URL }}" \
+            --from-literal=KV_REST_API_TOKEN="${{ secrets.KV_REST_API_TOKEN }}" \
+            --from-literal=KV_REST_API_READ_ONLY_TOKEN="${{ secrets.KV_REST_API_READ_ONLY_TOKEN }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply ConfigMap
+        run: kubectl apply -f k8s/configmap.yaml
+
+      - name: Update deployment image tag
+        run: |
+          sed -i '' "s|image: .*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}|g" k8s/deployment.yaml 2>/dev/null || \
+          sed -i "s|image: .*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}|g" k8s/deployment.yaml
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/go-gist-signal-server \
+            --namespace=${{ env.K8S_NAMESPACE }} \
+            --timeout=300s
+
+      - name: Verify deployment
+        run: |
+          echo "### Pods"
+          kubectl get pods --namespace=${{ env.K8S_NAMESPACE }} -l app=go-gist-signal-server
+          echo ""
+          echo "### Services"
+          kubectl get services --namespace=${{ env.K8S_NAMESPACE }}
+
+      - name: Deployment summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Access:** \`kubectl port-forward svc/go-gist-signal-server 3000:80 -n ${{ env.K8S_NAMESPACE }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Then visit: http://localhost:3000" >> $GITHUB_STEP_SUMMARY
+
+  health-check:
+    name: Health Check
+    runs-on: self-hosted
+    needs: deploy
+    env:
+      K8S_NAMESPACE: go-gist-signal-server
+    steps:
+      - name: Wait for service
+        run: sleep 10
+
+      - name: Health check
+        run: |
+          kubectl port-forward svc/go-gist-signal-server 3000:80 -n ${{ env.K8S_NAMESPACE }} &
+          PF_PID=$!
+          sleep 5
+
+          RETRY=0
+          MAX_RETRIES=5
+          until curl -sf "http://localhost:3000" > /dev/null || [ $RETRY -eq $MAX_RETRIES ]; do
+            echo "Attempt $((RETRY+1))/$MAX_RETRIES: Waiting for app..."
+            sleep 3
+            RETRY=$((RETRY+1))
+          done
+
+          kill $PF_PID 2>/dev/null || true
+
+          if [ $RETRY -eq $MAX_RETRIES ]; then
+            echo "Health check failed"
+            exit 1
+          fi
+          echo "Application is healthy"
+
+  rollback:
+    name: Rollback on Failure
+    runs-on: self-hosted
+    needs: [deploy, health-check]
+    if: failure()
+    env:
+      K8S_NAMESPACE: go-gist-signal-server
+    steps:
+      - name: Configure kubectl
+        run: kubectl config use-context docker-desktop 2>/dev/null || true
+
+      - name: Rollback deployment
+        run: |
+          echo "Deployment failed, rolling back..."
+          kubectl rollout undo deployment/go-gist-signal-server \
+            --namespace=${{ env.K8S_NAMESPACE }}
+          kubectl rollout status deployment/go-gist-signal-server \
+            --namespace=${{ env.K8S_NAMESPACE }} \
+            --timeout=300s
+          echo "Rollback completed"

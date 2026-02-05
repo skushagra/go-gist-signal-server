@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: go-gist-signal-server
+  namespace: go-gist-signal-server
+  labels:
+    app: go-gist-signal-server
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  tls:
+    - hosts:
+        - ${APP_URL_HOST}
+      secretName: go-gist-signal-server-tls
+  rules:
+    - host: ${APP_URL_HOST}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: go-gist-signal-server
+                port:
+                  number: 80

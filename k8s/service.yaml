@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-gist-signal-server
+  namespace: go-gist-signal-server
+  labels:
+    app: go-gist-signal-server
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 3000
+      protocol: TCP
+      name: http
+  selector:
+    app: go-gist-signal-server
